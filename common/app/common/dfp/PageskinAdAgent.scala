@@ -2,7 +2,7 @@ package common.dfp
 
 import common.Edition
 import com.gu.commercial.display.AdTargetParam.toMap
-import com.gu.commercial.display.MultipleValues
+import com.gu.commercial.display.{AdTargetParamValue, MultipleValues}
 import model.MetaData
 
 trait PageskinAdAgent {
@@ -25,11 +25,25 @@ trait PageskinAdAgent {
       } else Seq.empty
     } else {
       val targetingMap = toMap(metaData.commercial.map(_.adTargeting(edition)).getOrElse(Set.empty))
-      val keywordTargeting = targetingMap.get("k") match {
-        case Some(values: MultipleValues) => values.values.toSeq
-        case _ => Seq.empty
-      }
-      candidates filter { sponsorship => sponsorship.keywords.intersect(keywordTargeting).nonEmpty }
+
+      // Little DRY helper
+      val targetingMapValues = ((map: Map[String, AdTargetParamValue], key: String) =>
+        map.get(key) match {
+          case Some(values: MultipleValues) => values.values.toSeq
+          case _ => Seq.empty
+        }
+      )
+
+      val keywordTargeting = targetingMapValues( targetingMap , "k" )
+      val serieTargeting = targetingMapValues( targetingMap , "se" )
+
+      candidates filter { sponsorship => {
+                           // Two ways of matching:
+                           // - either the right keyword is there
+                           sponsorship.keywords.intersect(keywordTargeting).nonEmpty ||
+                           // - or the right series
+                           sponsorship.series.intersect(serieTargeting).nonEmpty
+                         }}
     }
   }
 
